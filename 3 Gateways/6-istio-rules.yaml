@@ -1,0 +1,68 @@
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: ingress-gateway-configuration #이름 수정
+spec:
+  selector:
+    istio: ingressgateway # use Istio default gateway implementation
+     
+  servers:
+  - port:
+      number: 80 # 31380 --> 80 --> target 80 
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*" #전체로 변경함 --> 원래는 external domain 네임이 들어가야됨. 여기서는 다른 서비스가 없으니깐 그냥..
+
+---
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-webapp
+  namespace: default
+  
+spec:
+  hosts:
+   #- fleetman-webapp.default.svc.cluster.local
+    - "*" # 원래는 도메인 네임이 들어가야되지만 여기서는 호스트 부분을 카피함 / /etc/hosts 파일에 fleetman.com 추가했는데도 안됨. 버그
+
+  gateways: 
+    - ingress-gateway-configuration # 게이트웨이 추가해주면 됨  
+  
+  http:
+    - match:
+      - uri:   # if
+          prefix: "/experimental"
+      - uri:   # or
+          prefix: "/canary"
+
+      route: #then part.....
+      - destination:
+          host: fleetman-webapp.default.svc.cluster.local
+          subset: experimental
+          
+    - match:
+      - uri:
+          prefix: "/"
+      route:       
+      - destination:
+          host: fleetman-webapp.default.svc.cluster.local
+          subset: original
+---
+
+kind: DestinationRule
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-webapp
+  namespace: default
+ 
+spec:
+  host: fleetman-webapp.default.svc.cluster.local
+  subsets:
+    - labels:
+        version: original
+      name: original
+    - labels:
+        version: experimental
+      name: experimental

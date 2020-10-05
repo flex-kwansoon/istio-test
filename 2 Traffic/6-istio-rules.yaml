@@ -1,0 +1,40 @@
+# vs는 서비스까지만 라우팅한다. 서브셋에 목적지에 대해서만 지정해주고.. dr 에서 최종 팟을 설정한다. 라벨로 되어 있지만 이건 셀렉터와 동일함  
+
+
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: a-set-of-routing-rules-we-can-call-this-anything  # "just" a name for this virtualservice
+  namespace: default
+spec:
+  hosts:
+    - fleetman-staff-service.default.svc.cluster.local  # The Service DNS (ie the regular K8S Service) name that we're applying routing rules to.
+  http:
+    - route:
+        - destination:
+            host: fleetman-staff-service.default.svc.cluster.local # The Target DNS name
+            subset: safe-group  # The name defined in the DestinationRule
+          weight: 100
+
+        - destination:
+            host: fleetman-staff-service.default.svc.cluster.local # The Target DNS name
+            subset: risky-group  # The name defined in the DestinationRule
+          weight: 0
+
+
+---
+kind: DestinationRule       # Defining which pods should be part of each subset
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: grouping-rules-for-our-photograph-canary-release # This can be anything you like.
+  namespace: default
+spec:
+  host: fleetman-staff-service # Service
+  subsets:
+    - labels:   # SELECTOR.
+        version: safe # find pods with label "safe"
+      name: safe-group
+
+    - labels:
+        version: risky #find pods with label "risky"
+      name: risky-group
